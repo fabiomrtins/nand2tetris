@@ -38,7 +38,7 @@ CHIP CPU {
         // C-Dest instructions
         DMux8Way(in=true, sel=instruction[3..5] , a=valueShouldNotBeStored, b=storeInM, c= storeInD, d=storeInMD, e=storeInARegister, f=storeInAM , g=storeInAD, h=storeAMD );
 
-        // A Register
+        // Address Register
         Or(a=storeInARegister, b=storeInAM, out=storeInAxAM );
         Or(a=storeInAD, b=storeAMD, out=storeInADOrAMD );
         Or(a=storeInAxAM, b=storeInADOrAMD, out=cStoreInA );
@@ -48,7 +48,7 @@ CHIP CPU {
         Mux16(a=instruction, b=aluInstruction, sel=isCInstructionAndShouldStoreInA, out=instructionOrAluInstruction);
         Register(in=instructionOrAluInstruction, load=storeInA, out=ARegister);
 
-        // D Register
+        // Data Register
         Or(a=storeInMD, b=storeAMD, out=storeInMDxAMD );
         Or(a=storeInAD, b=storeInD, out=storeInADxD );
         Or(a=storeInMDxAMD, b=storeInADxD, out=cStoreInD );
@@ -62,7 +62,7 @@ CHIP CPU {
 
         //ALU
         Mux16(a=ARegister, b=inM, sel=instruction[12], out=aRegisterOrM);
-        Or16(a=ARegister, b=inM, out[0..14]=addressM);
+        Or16(a=ARegister, b=false, out[0..14]=addressM);
         
         ALU(x=DRegister, y=aRegisterOrM, zx=instruction[11] , nx=instruction[10] , zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=aluInstruction, zr=zero, ng=negative );
 
@@ -75,36 +75,31 @@ CHIP CPU {
         Not(in=zero, out=notZero);
         Not(in=negative, out=notNegative);
 
-        // JGT
-        Or(a=notNegative, b=notZero, out=notNegativeAndNotZero);
+        // JGT = !zr && !ng
+        
+        And(a=notNegative, b=notZero, out=notNegativeAndNotZero);
         And(a=jumpGreaterThanZero, b=notNegativeAndNotZero, out=JGT);
     
-        // JEQ
+        // JEQ = zr
         And(a=jumpEqualsZero, b=zero, out=JEQ);
 
-        // JGE
-        Or(a=zero, b=notNegativeAndNotZero, out=equalsToZeroOrGreaterThan );
-        And(a=jumpGreaterThanOrEqualToZero, b=equalsToZeroOrGreaterThan, out=JGE);
+        // JGE = !ng
+        And(a=jumpGreaterThanOrEqualToZero, b=notNegative, out=JGE);
         
-        // JLT
+        // JLT = ng
         And(a=jumpLessThanZero, b=negative, out=JLT);
 
-        // JNE
+        // JNE = !zr
         And(a=jumpNotEqualsZero, b=notZero, out=JNE);
 
-        // JLE
+        // JLE = ng || zr
         Or(a=negative, b=zero, out=negativeOrZero);
         And(a=jumpLessThanEqualZero, b=negativeOrZero, out=JLE);
  
-        Or(a=JGT, b=JEQ, out=JGTOrJEQ);
-        Or(a=JGE, b=JLT, out=JGEOrJLT);
-        Or(a=JNE, b=JLE, out=JNEOrJLE);
-        Or(a=JGTOrJEQ, b=JGEOrJLT, out=JGTOrJEQOrJGEOrJLT);
-        Or(a=JGTOrJEQOrJGEOrJLT, b=JNEOrJLE, out=JGTOrJEQOrJGEOrJLTOrJNEOrJLE);
-        Or(a=JGTOrJEQOrJGEOrJLTOrJNEOrJLE, b=JMP, out=shouldJump);
-        And(a=cInstruction, b=shouldJump, out=shouldLoadAluValue);
-        
+        Or8Way(in[0]=JGT, in[1]=JEQ, in[2]=JGE, in[3]=JLT, in[4]=JNE, in[5]=JLE, in[6]=JMP, in[7]=false, out=shouldJump);
+        And(a=cInstruction, b=shouldJump, out=shouldLoadARegisterValue);
+
         // PC
         Not(in=reset, out=notReset );
-        PC(in=aluInstruction, load=shouldLoadAluValue, inc=notReset, reset=reset, out[0..14]=pc );
+        PC(in=ARegister, load=shouldLoadARegisterValue, inc=notReset, reset=reset, out[0..14]=pc );
 }
