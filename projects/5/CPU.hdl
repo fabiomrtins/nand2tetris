@@ -35,71 +35,54 @@ CHIP CPU {
 
         DMux(in=true, sel=instruction[15], a=aInstruction, b=cInstruction );
 
-        // C-Dest instructions
-        DMux8Way(in=true, sel=instruction[3..5] , a=valueShouldNotBeStored, b=storeInM, c= storeInD, d=storeInMD, e=storeInARegister, f=storeInAM , g=storeInAD, h=storeAMD );
-
         // Address Register
-        Or(a=storeInARegister, b=storeInAM, out=storeInAxAM );
-        Or(a=storeInAD, b=storeAMD, out=storeInADOrAMD );
-        Or(a=storeInAxAM, b=storeInADOrAMD, out=cStoreInA );
-        Or(a=aInstruction, b=cStoreInA, out=storeInA);
+        And(a=cInstruction, b=instruction[5], out=isCInstructionAndShouldStoreInA);
+        Or(a=aInstruction, b=isCInstructionAndShouldStoreInA, out=storeInA);
 
-        And(a=cInstruction, b=storeInA, out=isCInstructionAndShouldStoreInA);
         Mux16(a=instruction, b=aluInstruction, sel=isCInstructionAndShouldStoreInA, out=instructionOrAluInstruction);
-        Register(in=instructionOrAluInstruction, load=storeInA, out=ARegister);
+        ARegister(in=instructionOrAluInstruction, load=storeInA, out=outARegister, out[0..14]=addressM);
 
         // Data Register
-        Or(a=storeInMD, b=storeAMD, out=storeInMDxAMD );
-        Or(a=storeInAD, b=storeInD, out=storeInADxD );
-        Or(a=storeInMDxAMD, b=storeInADxD, out=cStoreInD );
-
-        Register(in=aluInstruction, load=cStoreInD, out=DRegister );
+        And(a=cInstruction, b=instruction[4] , out=cStoreInD );
+        DRegister(in=aluInstruction, load=cStoreInD, out=outDRegister );
 
         // M
-        Or(a=storeInM, b=storeInAM, out=storeInMxAM);
-        Or(a=storeInMxAM, b=storeInMDxAMD, out=storeInRam);
-        And(a=storeInRam, b=cInstruction, out=writeM );
+        And(a=cInstruction, b=instruction[3], out=writeM );
 
         //ALU
-        Mux16(a=ARegister, b=inM, sel=instruction[12], out=aRegisterOrM);
-        Or16(a=ARegister, b=false, out[0..14]=addressM);
-        
-        ALU(x=DRegister, y=aRegisterOrM, zx=instruction[11] , nx=instruction[10] , zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=aluInstruction, zr=zero, ng=negative );
+        Mux16(a=outARegister, b=inM, sel=instruction[12], out=aRegisterOrM);
 
-        // Should store in memory ( RAM[A] )
-        Mux16(a=false, b=aluInstruction, sel=storeInRam, out=outM);
-
-        // C-Jump instructions
-        DMux8Way(in=true, sel=instruction[0..2] , a=noJump, b=jumpGreaterThanZero, c=jumpEqualsZero, d=jumpGreaterThanOrEqualToZero, e=jumpLessThanZero, f=jumpNotEqualsZero , g=jumpLessThanEqualZero, h=JMP );
+        ALU(x=outDRegister, y=aRegisterOrM, zx=instruction[11] , nx=instruction[10] , zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=aluInstruction, out=outM, zr=zero, ng=negative );
 
         Not(in=zero, out=notZero);
         Not(in=negative, out=notNegative);
 
         // JGT = !zr && !ng
-        
         And(a=notNegative, b=notZero, out=notNegativeAndNotZero);
-        And(a=jumpGreaterThanZero, b=notNegativeAndNotZero, out=JGT);
-    
+        And(a=instruction[0], b=notNegativeAndNotZero, out=JGT);
+        
         // JEQ = zr
-        And(a=jumpEqualsZero, b=zero, out=JEQ);
+        And(a=instruction[1], b=zero, out=JEQ);
 
         // JGE = !ng
-        And(a=jumpGreaterThanOrEqualToZero, b=notNegative, out=JGE);
-        
+        And(a=JEQ, b=JGT, out=JGE);
+
         // JLT = ng
-        And(a=jumpLessThanZero, b=negative, out=JLT);
+        And(a=instruction[2], b=negative, out=JLT);
 
         // JNE = !zr
-        And(a=jumpNotEqualsZero, b=notZero, out=JNE);
+        Or(a=JGT, b=JLT, out=JNE);
 
         // JLE = ng || zr
-        Or(a=negative, b=zero, out=negativeOrZero);
-        And(a=jumpLessThanEqualZero, b=negativeOrZero, out=JLE);
+        Or(a=JLT, b=JEQ, out=JLE);
  
-        Or8Way(in[0]=JGT, in[1]=JEQ, in[2]=JGE, in[3]=JLT, in[4]=JNE, in[5]=JLE, in[6]=JMP, in[7]=false, out=shouldJump);
-        And(a=cInstruction, b=shouldJump, out=shouldLoadARegisterValue);
+        // JLT || JEQ || JGT = JMP
+        Or(a=JEQ, b=JGT, out=JEQAndJGT );
+        Or(a=JEQAndJGT, b=JLT, out=JMP );
+
+        And(a=cInstruction, b=JMP, out=shouldLoadARegisterValue);
 
         // PC
         Not(in=reset, out=notReset );
-        PC(in=ARegister, load=shouldLoadARegisterValue, inc=notReset, reset=reset, out[0..14]=pc );
+        PC(in=outARegister, load=shouldLoadARegisterValue, inc=notReset, reset=reset, out[0..14]=pc );
 }
