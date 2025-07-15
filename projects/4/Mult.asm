@@ -2,6 +2,9 @@
 M=0
 @i
 M=0
+@R2
+M=0
+D=0
 
 (IS_I_LESSER_THAN_R1)
     @R1
