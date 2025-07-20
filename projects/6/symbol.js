@@ -24,6 +24,32 @@ const symbols = {
     'THAT': 4
 }
 
+let memoryAddressNumber = 16
+
 module.exports = {
-    
+    addSymbol: (symbol, lineNumber) => {
+        const labelName = symbol.replace(/\(|\)/g, "");
+
+        if(!symbols[labelName]) {
+            symbols[labelName] = lineNumber
+        }
+
+        return symbols[symbol]
+    },
+    addVariable: (parsedInstruction) => {
+        const parsedInstructionValue = parsedInstruction.value;
+        const valueHasNonDigits = parsedInstructionValue.match(/\D/);
+
+        if (!valueHasNonDigits) {
+            return parsedInstruction.value
+        }
+
+        if (!symbols.hasOwnProperty(parsedInstructionValue)) {
+            symbols[parsedInstructionValue] = memoryAddressNumber;
+
+            memoryAddressNumber++
+        }
+
+        return symbols[parsedInstructionValue]
+    }
 }

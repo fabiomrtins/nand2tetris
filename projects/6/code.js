@@ -1,6 +1,3 @@
-const { parse } = require("./parser");
-
-// AM=M-1
 const destTable = {
     null: "000",
     "M": "001",
@@ -53,12 +50,14 @@ const jumpTable = {
     "JMP": "111"
 }
 
+const C_INSTRUCTION_PREFIX = "111";
+
 module.exports = {
-    instructionToBinary(instruction) {
+    instructionToBinary(parsedInstruction) {
         let binary = null
 
-        if (instruction.startsWith('@')) {
-            const addressAsNumber = +instruction.slice(1);
+        if (parsedInstruction.type === 'A') {
+            const addressAsNumber = +parsedInstruction.value;
 
             const unpaddedBinary = addressAsNumber.toString(2);
 
@@ -67,8 +66,9 @@ module.exports = {
             return binary
         }
 
-        const [dest, comp, jump] = parse(instruction);
-        binary = "111" + compTable[comp] + destTable[dest] + jumpTable[jump];
+        const { dest, comp, jump } = parsedInstruction
+
+        binary = C_INSTRUCTION_PREFIX + compTable[comp] + destTable[dest] + jumpTable[jump];
 
         return binary   
     }
