@@ -23,7 +23,7 @@ for (const line of lines) {
 
     const parsedInstruction = parseInstruction(trimmedLine)
 
-    const assemblyInstruction = instructionToAssembly(parsedInstruction)
+    const assemblyInstruction = instructionToAssembly(parsedInstruction, fileName)
 
-    fs.appendFileSync(`./${fileName}.asm`, assemblyInstruction)
+    fs.appendFileSync(`./asm_files/${fileName}.asm`, assemblyInstruction)
 }

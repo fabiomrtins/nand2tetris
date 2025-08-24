@@ -39,60 +39,43 @@ const arithmeticMapper = {
 AM=M-1
 D=M
 ${STACK_POINTER}
-AM=M-1
-D=D+M
-${STACK_POINTER}
-A=M
-M=D
-${STACK_POINTER}
-M=M+1\n`,
+A=M-1
+M=D+M\n`,
   sub: `${STACK_POINTER}
 AM=M-1
 D=M
 ${STACK_POINTER}
-AM=M-1
-D=M-D
-${STACK_POINTER}
-A=M
-M=D
-${STACK_POINTER}
-M=M+1\n`,
+A=M-1
+M=M-D\n`,
   neg: `${STACK_POINTER}
 A=M-1
 M=-M\n`,
-  eq: (instructionCounter) => conditionalJumpOperation("JEQ", instructionCounter),
-  gt: (instructionCounter) => conditionalJumpOperation("JGT", instructionCounter),
-  lt: (instructionCounter) => conditionalJumpOperation("JLT", instructionCounter),
+  eq: (instructionCounter) =>
+    conditionalJumpOperation("JEQ", instructionCounter),
+  gt: (instructionCounter) =>
+    conditionalJumpOperation("JGT", instructionCounter),
+  lt: (instructionCounter) =>
+    conditionalJumpOperation("JLT", instructionCounter),
   and: `${STACK_POINTER}
 AM=M-1
 D=M
 ${STACK_POINTER}
-AM=M-1
-D=D&M
-${STACK_POINTER}
-A=M
-M=D
-${STACK_POINTER}
-M=M+1\n`,
+A=M-1
+M=D&M\n`,
   or: `${STACK_POINTER}
 AM=M-1
 D=M
 ${STACK_POINTER}
-AM=M-1
-D=D|M
-${STACK_POINTER}
-A=M
-M=D
-${STACK_POINTER}
-M=M+1\n`,
+A=M-1
+M=D|M\n`,
   not: `${STACK_POINTER}
 A=M-1
 M=!M\n`,
 };
 
-let instructionCounter = 0
+let instructionCounter = 0;
 module.exports = {
-  instructionToAssembly(parsedInstruction, debug = true) {
+  instructionToAssembly(parsedInstruction, filename, debug = true) {
     let assembly = "";
 
     if (debug) {
@@ -106,10 +89,9 @@ module.exports = {
 
       if (parsedInstruction.stack === "constant") {
         const accessConstantAddress = `@${parsedInstruction.value}\n`;
-        const storeAddressValueInDRegister = "D=A\n";
 
         assembly += accessConstantAddress;
-        assembly += storeAddressValueInDRegister;
+        assembly += "D=A\n";
         assembly += `${STACK_POINTER}\n`;
         assembly += "A=M\n"; // *SP
         assembly += "M=D\n"; // *SP = constant
@@ -157,6 +139,14 @@ module.exports = {
         assembly += "M=D\n"; // *SP = THIS or THAT
         assembly += `${STACK_POINTER}\n`;
         assembly += "M=M+1\n";
+      } else if (parsedInstruction.stack === "static") {
+        assembly += `@${filename}.${parsedInstruction.value}\n`;
+        assembly += `D=M\n`;
+        assembly += `${STACK_POINTER}\n`;
+        assembly += `A=M\n`;
+        assembly += "M=D\n";
+        assembly += `${STACK_POINTER}\n`;
+        assembly += `M=M+1\n`;
       }
     } else if (parsedInstruction.type === "C_POP") {
       assembly += `${STACK_POINTER}\n`;
@@ -172,12 +162,14 @@ module.exports = {
             : stackMapper["that"];
 
         assembly += `${thisOrThatBaseAddress}\n`;
+      } else if (parsedInstruction.stack === "static") {
+        assembly += `@${filename}.${parsedInstruction.value}\n`;
       } else {
         assembly += `${baseStackPointerSymbol}\n`;
         assembly += `A=M\n`; // A = *baseStackPointerAddress
       }
 
-      if (parsedInstruction.stack !== "pointer") {
+      if (parsedInstruction.stack !== "pointer" && parsedInstruction.stack !== "static") {
         for (let i = 0; i < parsedInstruction.value; i++) {
           assembly += "A=A+1\n";
         }
@@ -188,14 +180,14 @@ module.exports = {
       const conditionalEvaluationOperations = ["eq", "gt", "lt"];
 
       if (conditionalEvaluationOperations.includes(parsedInstruction.value)) {
-        assembly += arithmeticMapper[parsedInstruction.value](instructionCounter);
+        assembly +=
+          arithmeticMapper[parsedInstruction.value](instructionCounter);
       } else {
-        assembly += arithmeticMapper[parsedInstruction.value]
+        assembly += arithmeticMapper[parsedInstruction.value];
       }
-
     }
 
-    instructionCounter++
+    instructionCounter++;
     return assembly;
   },
 };
